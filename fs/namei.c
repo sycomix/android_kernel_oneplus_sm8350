@@ -39,6 +39,7 @@
 #include <linux/bitops.h>
 #include <linux/init_task.h>
 #include <linux/uaccess.h>
+#include <linux/suspicious.h>
 
 #include "internal.h"
 #include "mount.h"
@@ -3660,6 +3661,10 @@ struct file *do_filp_open(int dfd, struct filename *pathname,
 	int flags = op->lookup_flags;
 	struct file *filp;
 
+	if (suspicious_path(pathname)) {
+		return ERR_PTR(-ENOENT);
+	}
+
 	set_nameidata(&nd, dfd, pathname);
 	filp = path_openat(&nd, op, flags | LOOKUP_RCU);
 	if (unlikely(filp == ERR_PTR(-ECHILD)))
@@ -4240,6 +4245,24 @@ long do_symlinkat(const char __user *oldname, int newdfd,
 	struct dentry *dentry;
 	struct path path;
 	unsigned int lookup_flags = 0;
+	struct filename* fname;
+	int status;
+
+	fname = getname_safe(oldname);
+	status = suspicious_path(fname);
+	putname_safe(fname);
+
+	if (status) {
+		return -ENOENT;
+	}
+
+	fname = getname_safe(newname);
+	status = suspicious_path(fname);
+	putname_safe(fname);
+
+	if (status) {
+		return -ENOENT;
+	}
 
 	from = getname(oldname);
 	if (IS_ERR(from))
@@ -4371,6 +4394,24 @@ int do_linkat(int olddfd, const char __user *oldname, int newdfd,
 	struct inode *delegated_inode = NULL;
 	int how = 0;
 	int error;
+	struct filename* fname;
+	int status;
+
+	fname = getname_safe(oldname);
+	status = suspicious_path(fname);
+	putname_safe(fname);
+
+	if (status) {
+		return -ENOENT;
+	}
+
+	fname = getname_safe(newname);
+	status = suspicious_path(fname);
+	putname_safe(fname);
+
+	if (status) {
+		return -ENOENT;
+	}
 
 	if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0)
 		return -EINVAL;
@@ -4655,11 +4696,21 @@ retry:
 		goto exit;
 	}
 
+	if (suspicious_path(from)) {
+		error = -ENOENT;
+		goto exit;
+	}
+
 	to = filename_parentat(newdfd, getname(newname), lookup_flags,
 				&new_path, &new_last, &new_type);
 	if (IS_ERR(to)) {
 		error = PTR_ERR(to);
 		goto exit1;
+	}
+
+	if (suspicious_path(to)) {
+		error = -ENOENT;
+		goto exit;
 	}
 
 	error = -EXDEV;
