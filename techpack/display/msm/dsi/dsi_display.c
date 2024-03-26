@@ -3082,7 +3082,7 @@ error:
 	return rc;
 }
 
-#ifdef CONFIG_DEEPSLEEP
+#if defined(CONFIG_DEEPSLEEP) || defined(CONFIG_HIBERNATION)
 int dsi_display_unset_clk_src(struct dsi_display *display)
 {
 	int rc = 0;
@@ -8251,7 +8251,7 @@ static void dsi_display_handle_fifo_overflow(struct work_struct *work)
 	 * Add sufficient delay to make sure
 	 * pixel transmission has started
 	 */
-	udelay(200);
+	usleep_range(190, 210);
 end:
 	dsi_display_clk_ctrl(display->dsi_clk_handle,
 			DSI_ALL_CLKS, DSI_CLK_OFF);
